@@ -51,6 +51,8 @@ class BaseMetric(metaclass=ABCMeta):
         self._dataset_meta: Union[None, dict] = None
         self.collect_device = collect_device
         self.results: List[Any] = []
+        self.pred_label: Tensor
+        self.label: Tensor
         self.prefix = prefix or self.default_prefix
         self.collect_dir = collect_dir
 
@@ -84,7 +86,7 @@ class BaseMetric(metaclass=ABCMeta):
         """
 
     @abstractmethod
-    def compute_metrics(self, results: list) -> dict:
+    def compute_metrics(self, results: list, pred_label, label) -> dict:
         """Compute the metrics from processed results.
 
         Args:
@@ -130,6 +132,7 @@ class BaseMetric(metaclass=ABCMeta):
         if is_main_process():
             # cast all tensors in results list to cpu
             results = _to_cpu(results)
+            # _metrics = self.compute_metrics(results, self.pred_label, self.label)  # type: ignore
             _metrics = self.compute_metrics(results)  # type: ignore
             # Add prefix to metric names
             if self.prefix:

@@ -130,7 +130,7 @@ class EarlyStoppingHook(Hook):
         assert hasattr(runner.train_loop, 'stop_training'), \
             '`train_loop` should contain `stop_training` variable.'
 
-    def after_val_epoch(self, runner, metrics):
+    def after_val_iter(self, runner, metrics):
         """Decide whether to stop the training process.
 
         Args:
@@ -138,22 +138,31 @@ class EarlyStoppingHook(Hook):
             metrics (dict): Evaluation results of all metrics
         """
 
-        if self.monitor not in metrics:
-            if self.strict:
-                raise RuntimeError(
-                    'Early stopping conditioned on metric '
-                    f'`{self.monitor} is not available. Please check available'
-                    f' metrics {metrics}, or set `strict=False` in '
-                    '`EarlyStoppingHook`.')
-            warnings.warn(
-                'Skip early stopping process since the evaluation '
-                f'results ({metrics.keys()}) do not include `monitor` '
-                f'({self.monitor}).')
-            return
+        try:
+            if self.monitor not in metrics:
+                if self.strict:
+                    raise RuntimeError(
+                        f'Metric {self.monitor} not found in {metrics.keys()}'
+                    )
+                warnings.warn(
+                    f'Monitor metric {self.monitor} not found, skipping early stopping'
+                )
+                return
 
-        current_score = metrics[self.monitor]
+            current_score = metrics[self.monitor]
 
-        stop_training, message = self._check_stop_condition(current_score)
-        if stop_training:
-            runner.train_loop.stop_training = True
-            runner.logger.info(message)
+            stop_training, message = self._check_stop_condition(current_score)
+            if stop_training:
+                runner.train_loop.stop_training = True
+                runner.logger.info('[EarlyStopping] ' + message)
+
+            runner.logger.info(
+                f'[EarlyStopping] monitor: {self.monitor}, best: {self.best_score:.4f}, '
+                f'current: {current_score:.4f}, wait_count: {self.wait_count}/{self.patience}'
+            )
+
+        except Exception as e:
+            import traceback
+            runner.logger.error('[EarlyStopping] Hook failed with error:')
+            runner.logger.error(traceback.format_exc())
+            raise e
